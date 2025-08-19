@@ -101,7 +101,7 @@ const Header = ({ setPage, user }) => (
 );
 
 const ProductCard = ({ product, onGet, purchased }) => (
-    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-2 transition-transform duration-300 group">
+    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-2 transition-transform duration-300 group card-pulse">
         <div className="relative">
             <img src={product.coverArtUrl} alt={product.title} className="w-full h-56 object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x300/1a1a2e/e94560?text=Image+Error'; }}/>
             <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -172,7 +172,7 @@ const HomePage = ({ products, onGet, userProfile, setPage }) => {
         <div>
             {/* Hero Section */}
             <div className="bg-gray-900 text-white text-center py-20 px-6">
-                <h1 className="text-5xl font-extrabold mb-4 animate-fade-in-down">Discover Your Next Favorite Track</h1>
+                <h1 className="text-5xl font-extrabold mb-4 animate-fade-in-down gradient-text">Discover Your Next Favorite Track</h1>
                 <p className="text-xl text-gray-300 mb-8 animate-fade-in-up">High-quality music and video downloads at your fingertips.</p>
                 <button onClick={() => setPage('music')} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-full hover:bg-pink-600 transition-transform hover:scale-105 transform">
                     Explore Music
@@ -432,6 +432,45 @@ export default function App() {
     // --- Admin User IDs ---
     // In a real app, this would be managed securely in your backend/database rules.
     const ADMIN_UIDS = ['YOUR_ADMIN_UID_HERE']; 
+
+    // --- Inject Custom CSS Stylesheet ---
+    useEffect(() => {
+        const customCss = `
+            .gradient-text {
+                background: linear-gradient(90deg, #f957d0, #e94560);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                text-fill-color: transparent;
+            }
+
+            @keyframes subtle-pulse {
+                0%, 100% { 
+                    transform: scale(1); 
+                }
+                50% { 
+                    transform: scale(1.03); 
+                }
+            }
+
+            .card-pulse:hover {
+                animation: subtle-pulse 2s ease-in-out infinite;
+            }
+        `;
+        const styleElement = document.createElement('style');
+        styleElement.id = 'custom-styles';
+        styleElement.innerHTML = customCss;
+        document.head.appendChild(styleElement);
+
+        // Cleanup function to remove the style when the component unmounts
+        return () => {
+            const style = document.getElementById('custom-styles');
+            if (style) {
+                document.head.removeChild(style);
+            }
+        };
+    }, []);
+
 
     useEffect(() => {
         if (!isFirebaseConfigured) {
