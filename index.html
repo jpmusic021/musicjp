@@ -43,7 +43,7 @@
             <a href="#" onclick="showPage('profile')" class="flex items-center p-3 rounded-lg hover:bg-gray-800"><i class="fas fa-download w-8 text-center text-lg"></i><span class="sidebar-link-text ml-4">My Downloads</span></a>
         </nav>
         <div class="p-4 border-t border-gray-800">
-            <a href="admin.html" onclick="showPage('login')" class="flex items-center p-3 rounded-lg hover:bg-gray-800"><i class="fas fa-shield-halved w-8 text-center text-lg"></i><span class="sidebar-link-text ml-4">Admin Login</span></a>
+             <a href="#" onclick="showPage('login')" class="flex items-center p-3 rounded-lg hover:bg-gray-800"><i class="fas fa-shield-halved w-8 text-center text-lg"></i><span class="sidebar-link-text ml-4">Admin Login</span></a>
         </div>
     </aside>
 
@@ -88,12 +88,14 @@
                             <div>
                                 <h1 id="profile-name" class="text-4xl font-bold">Guest</h1>
                                 <p id="profile-email" class="text-gray-400">guest@example.com</p>
-                                <span id="profile-plan" class="inline-block bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full mt-2">FREE</span>
+                                <span id="profile-plan" class="inline-block bg-gray-600 text-white text-xs font-bold px-3 py-1 rounded-full mt-2">GUEST</span>
                             </div>
                         </div>
                         <div class="mt-8 border-t border-gray-700 pt-8">
                             <h3 class="text-2xl font-bold mb-4">My Purchases</h3>
-                            <div id="purchases-list" class="space-y-4"></div>
+                            <div id="purchases-list" class="space-y-4">
+                                <p class="text-gray-400">No purchases yet.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -216,8 +218,7 @@
     <script type="module">
         // ====== Firebase v9+ Modular SDK ======
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, orderBy, query, doc, deleteDoc, updateDoc, getCountFromServer, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, orderBy, query, doc, deleteDoc, updateDoc, getDoc, where } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
         import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
         // --- TODO: Replace with your Firebase project config ---
@@ -227,22 +228,17 @@
           projectId: "YOUR_PROJECT_ID",
           storageBucket: "YOUR_PROJECT_ID.appspot.com",
           messagingSenderId: "YOUR_SENDER_ID",
-          appId: "YOUR_APP_ID",
-          databaseURL: "" // not needed for Firestore
+          appId: "YOUR_APP_ID"
         };
 
-        // Admin email (simple gate). Better: use custom claims/role in production.
-        const ADMIN_EMAIL = "jjayuyt@gmail.com"; // change if needed
-
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
         const storage = getStorage(app);
 
         // ====== UI Helpers ======
         const pages = document.querySelectorAll('.page');
         const mainContent = document.getElementById('main-content');
-        function showPage(pageId) { pages.forEach(p => p.id === pageId ? p.classList.remove('hidden') : p.classList.add('hidden')); mainContent.scrollTop = 0; }
+        window.showPage = (pageId) => { pages.forEach(p => p.id === pageId ? p.classList.remove('hidden') : p.classList.add('hidden')); mainContent.scrollTop = 0; }
 
         // Sidebar toggle
         const sidebar = document.getElementById('sidebar');
@@ -255,38 +251,25 @@
             else { setTimeout(() => { logoText.style.display = 'inline'; }, 150); }
         });
 
-        // ====== Auth (Admin Login) ======
+        // ====== Admin Login (Simple) ======
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
-        loginForm.addEventListener('submit', async (e) => {
+        
+        loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = /** @type {HTMLInputElement} */(document.getElementById('email')).value.trim();
-            const password = /** @type {HTMLInputElement} */(document.getElementById('password')).value;
-            try {
-                const cred = await signInWithEmailAndPassword(auth, email, password);
-                if (cred.user.email !== ADMIN_EMAIL) {
-                    // Not an admin
-                    await signOut(auth);
-                    loginError.textContent = 'Access denied. Admin only.';
-                    loginError.classList.remove('hidden');
-                    return;
-                }
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (email === 'jjayuyt@gmail.com' && password === 'Jatystr@021') {
                 loginError.classList.add('hidden');
                 showPage('admin');
-            } catch (err) {
-                loginError.textContent = 'Invalid email or password.';
+            } else {
                 loginError.classList.remove('hidden');
             }
         });
 
-        onAuthStateChanged(auth, (user) => {
-            // You can update profile UI here if needed
-        });
-
         // ====== Firestore: Live Collections ======
         const mediaCol = collection(db, 'media');
-
-        // Home page real-time lists
         const videosGrid = document.getElementById('videos-grid');
         const musicGrid = document.getElementById('music-grid');
 
@@ -312,21 +295,13 @@
                 </div>`;
         }
 
-        // Live query for videos
         onSnapshot(query(mediaCol, where('status','==','published'), where('type','==','Video'), orderBy('createdAt','desc')), (snap) => {
-            videosGrid.innerHTML = '';
-            snap.forEach(docu => {
-                const item = { id: docu.id, ...docu.data() };
-                videosGrid.insertAdjacentHTML('beforeend', mediaCard(item));
-            });
+            videosGrid.innerHTML = snap.empty ? '<p class="text-gray-400 col-span-full">No videos have been uploaded yet.</p>' : '';
+            snap.forEach(docu => videosGrid.insertAdjacentHTML('beforeend', mediaCard({ id: docu.id, ...docu.data() })));
         });
-        // Live query for music
         onSnapshot(query(mediaCol, where('status','==','published'), where('type','==','Music'), orderBy('createdAt','desc')), (snap) => {
-            musicGrid.innerHTML = '';
-            snap.forEach(docu => {
-                const item = { id: docu.id, ...docu.data() };
-                musicGrid.insertAdjacentHTML('beforeend', mediaCard(item));
-            });
+            musicGrid.innerHTML = snap.empty ? '<p class="text-gray-400 col-span-full">No music has been uploaded yet.</p>' : '';
+            snap.forEach(docu => musicGrid.insertAdjacentHTML('beforeend', mediaCard({ id: docu.id, ...docu.data() })));
         });
 
         // ====== Admin: table live ======
@@ -340,11 +315,7 @@
             const access = item.access === 'paid' ? 'Paid' : 'Free';
             const price = item.access === 'paid' ? `₹${Number(item.price||0).toFixed(0)}` : '—';
             return `<tr id="row-${item.id}" class="border-b border-gray-800">
-                <td class="p-3">${item.title}</td>
-                <td class="p-3">${item.type}</td>
-                <td class="p-3">${access}</td>
-                <td class="p-3">${price}</td>
-                <td class="p-3">${badge}</td>
+                <td class="p-3">${item.title}</td> <td class="p-3">${item.type}</td> <td class="p-3">${access}</td> <td class="p-3">${price}</td> <td class="p-3">${badge}</td>
                 <td class="p-3 space-x-2">
                     <button class="text-blue-400 hover:text-blue-300" data-edit-id="${item.id}"><i class="fas fa-edit"></i></button>
                     <button class="text-red-500 hover:text-red-400" data-delete-id="${item.id}" data-storage-path="${item.storagePath || ''}"><i class="fas fa-trash"></i></button>
@@ -353,8 +324,8 @@
         }
 
         onSnapshot(query(mediaCol, orderBy('createdAt','desc')), (snap) => {
-            contentBody.innerHTML = '';
-            let itemsForSale = 0; let downloads = 0; let revenue = 0; let users = 0; // users placeholder
+            contentBody.innerHTML = snap.empty ? '<tr><td colspan="6" class="p-4 text-center text-gray-400">No content uploaded yet.</td></tr>' : '';
+            let itemsForSale = 0, downloads = 0, revenue = 0;
             snap.forEach(docu => {
                 const item = { id: docu.id, ...docu.data() };
                 if(item.access==='paid') itemsForSale++;
@@ -366,52 +337,42 @@
             document.getElementById('stat-downloads').textContent = String(downloads);
             document.getElementById('stat-revenue').textContent = `₹${revenue.toFixed(0)}`;
         });
-
-        // Delegated events for edit/delete buttons
+        
         contentBody.addEventListener('click', (e) => {
             const delBtn = e.target.closest('[data-delete-id]');
             const editBtn = e.target.closest('[data-edit-id]');
-            if (delBtn) { currentDeleteId = delBtn.getAttribute('data-delete-id'); deleteModal.classList.remove('hidden'); }
-            if (editBtn) { openEditForm(editBtn.getAttribute('data-edit-id')); }
+            if (delBtn) { currentDeleteId = delBtn.dataset.deleteId; deleteModal.classList.remove('hidden'); }
+            if (editBtn) { openEditForm(editBtn.dataset.editId); }
         });
-        function closeDeleteModal(){ currentDeleteId = null; deleteModal.classList.add('hidden'); }
-        window.closeDeleteModal = closeDeleteModal;
+        window.closeDeleteModal = () => { currentDeleteId = null; deleteModal.classList.add('hidden'); };
         confirmDeleteBtn.addEventListener('click', async () => {
             if (!currentDeleteId) return;
             try {
                 const row = document.getElementById(`row-${currentDeleteId}`);
-                const storagePath = row?.querySelector('[data-delete-id]')?.getAttribute('data-storage-path');
+                const storagePath = row?.querySelector('[data-delete-id]')?.dataset.storagePath;
                 await deleteDoc(doc(db, 'media', currentDeleteId));
-                if (storagePath) { try { await deleteObject(sRef(storage, storagePath)); } catch(err) { /* ignore */ } }
+                if (storagePath) { try { await deleteObject(sRef(storage, storagePath)); } catch(err) { console.error("Error deleting file from storage:", err) } }
             } finally { closeDeleteModal(); }
         });
 
         // ====== Upload flow ======
         const uploadForm = document.getElementById('upload-form');
-        const uploadStatus = document.getElementById('upload-status');
-        const uploadProgress = document.getElementById('upload-progress');
-
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const title = document.getElementById('title').value.trim();
             const artist = document.getElementById('artist').value.trim();
             const type = document.getElementById('type').value;
-            const access = document.getElementById('access').value; // free/paid
+            const access = document.getElementById('access').value;
             const price = Number(document.getElementById('price').value || 0);
             const date = document.getElementById('date').value;
             const driveLink = document.getElementById('drive-link').value.trim();
             const file = document.getElementById('file').files[0];
+            const uploadStatus = document.getElementById('upload-status');
+            const uploadProgress = document.getElementById('upload-progress');
 
             uploadStatus.textContent = 'Creating item...';
-
-            // Pre-create doc to get id
-            const docRef = await addDoc(mediaCol, {
-                title, artist, type, access, price, status: 'published', date, url: '', storagePath: '', createdAt: serverTimestamp(), downloads: 0, revenue: 0
-            });
-
-            let url = driveLink;
-            let storagePath = '';
-
+            const docRef = await addDoc(mediaCol, { title, artist, type, access, price, status: 'published', date, url: driveLink, storagePath: '', createdAt: serverTimestamp(), downloads: 0, revenue: 0 });
+            
             if (file) {
                 const path = `media/${docRef.id}/${file.name}`;
                 const fileRef = sRef(storage, path);
@@ -423,33 +384,30 @@
                         uploadStatus.textContent = `Uploading ${pct}%...`;
                     }, reject, resolve);
                 });
-                url = await getDownloadURL(task.snapshot.ref);
-                storagePath = task.snapshot.ref.fullPath;
+                const url = await getDownloadURL(task.snapshot.ref);
+                const storagePath = task.snapshot.ref.fullPath;
+                await updateDoc(doc(db, 'media', docRef.id), { url, storagePath });
             }
 
-            await updateDoc(doc(db, 'media', docRef.id), { url, storagePath });
             uploadStatus.textContent = 'Uploaded successfully!';
             uploadForm.reset();
             uploadProgress.style.width = '0%';
-            showPage('admin');
+            setTimeout(() => showPage('admin'), 1000);
         });
 
         // ====== Edit flow ======
         const editForm = document.getElementById('edit-form');
-        function openEditForm(id){
-            window.scrollTo({top:0});
+        const openEditForm = async (id) => {
             showPage('edit-content');
-            (async () => {
-                const dref = doc(db, 'media', id);
-                const snap = await (await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js')).getDoc(dref);
-                const data = snap.data();
-                document.getElementById('edit-item-id').value = id;
-                document.getElementById('edit-title').value = data.title || '';
-                document.getElementById('edit-type').value = data.type || '';
-                document.getElementById('edit-access').value = data.access || 'free';
-                document.getElementById('edit-price').value = Number(data.price || 0);
-            })();
-        }
+            const dref = doc(db, 'media', id);
+            const snap = await getDoc(dref);
+            const data = snap.data();
+            document.getElementById('edit-item-id').value = id;
+            document.getElementById('edit-title').value = data.title || '';
+            document.getElementById('edit-type').value = data.type || '';
+            document.getElementById('edit-access').value = data.access || 'free';
+            document.getElementById('edit-price').value = Number(data.price || 0);
+        };
         window.openEditForm = openEditForm;
 
         editForm.addEventListener('submit', async (e) => {
@@ -463,24 +421,19 @@
             showPage('admin');
         });
 
-        // ====== Public actions (preview/buy placeholder) ======
-        window.previewItem = (id) => {
-            alert('Preview coming soon for item ' + id);
-        };
-        window.buyItem = (id) => {
-            alert('Integrate Razorpay/Stripe here. Item: ' + id);
-        };
+        // ====== Public actions (placeholders) ======
+        window.previewItem = (id) => { alert('Preview coming soon for item ' + id); };
+        window.buyItem = (id) => { alert('Integrate payment gateway here. Item: ' + id); };
 
         // ====== Search filter (client-side) ======
         document.getElementById('search').addEventListener('input', (e) => {
             const q = e.target.value.toLowerCase();
             document.querySelectorAll('#videos-grid > div, #music-grid > div').forEach(card => {
-                const text = card.textContent.toLowerCase();
-                card.style.display = text.includes(q) ? '' : 'none';
+                card.style.display = card.textContent.toLowerCase().includes(q) ? '' : 'none';
             });
         });
 
-        // Default to Home
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => { showPage('home'); });
     </script>
 
