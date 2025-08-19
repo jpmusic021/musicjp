@@ -1,0 +1,570 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, doc, getDocs, setDoc, addDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { Music, Video, User, Shield, Home, Upload, PlusCircle, Trash2, X, Download, ShoppingCart, LogOut, Play } from 'lucide-react';
+
+// --- Firebase Configuration ---
+// IMPORTANT: Replace with your actual Firebase configuration
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+// --- Initialize Firebase ---
+// Check if firebase config is provided, otherwise use a placeholder
+let app, auth, db;
+const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+if (isFirebaseConfigured) {
+    try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+    } catch (error) {
+        console.error("Firebase initialization error:", error);
+    }
+}
+
+
+// --- Mock Data (Used if Firebase is not configured) ---
+const mockProducts = [
+  { id: '1', title: 'Cosmic Drift', artist: 'Galaxy Runners', type: 'music', category: 'Electronic', price: 1.99, coverArtUrl: 'https://placehold.co/300x300/1a1a2e/e94560?text=Cosmic+Drift', downloadUrl: '#' },
+  { id: '2', title: 'Ocean Whispers', artist: 'Serene Waves', type: 'music', category: 'Ambient', price: 0, coverArtUrl: 'https://placehold.co/300x300/1f4068/e94560?text=Ocean+Whispers', downloadUrl: '#' },
+  { id: '3', title: 'City Lights', artist: 'Urban Explorers', type: 'video', category: 'Travel', price: 5.99, coverArtUrl: 'https://placehold.co/300x300/2e2e3a/e94560?text=City+Lights', downloadUrl: '#' },
+  { id: '4', title: 'Mountain Majesty', artist: 'Nature Views', type: 'video', category: 'Nature', price: 0, coverArtUrl: 'https://placehold.co/300x300/162447/e94560?text=Mountain+Majesty', downloadUrl: '#' },
+  { id: '5', title: 'Retro Groove', artist: 'The Funky Cats', type: 'music', category: 'Funk', price: 2.49, coverArtUrl: 'https://placehold.co/300x300/e94560/1a1a2e?text=Retro+Groove', downloadUrl: '#' },
+];
+
+const mockCategories = [
+    { id: 'c1', name: 'Electronic', type: 'music' },
+    { id: 'c2', name: 'Ambient', type: 'music' },
+    { id: 'c3', name: 'Funk', type: 'music' },
+    { id: 'c4', name: 'Travel', type: 'video' },
+    { id: 'c5', name: 'Nature', type: 'video' },
+];
+
+
+// --- Helper Components ---
+
+const IconWrapper = ({ icon: Icon, className = '' }) => <Icon className={`inline-block mr-2 ${className}`} />;
+
+const Modal = ({ children, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+        <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md relative animate-fade-in-up">
+            <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors">
+                <X size={24} />
+            </button>
+            <div className="p-6">
+                {children}
+            </div>
+        </div>
+    </div>
+);
+
+const Spinner = () => (
+    <div className="flex justify-center items-center h-full">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-pink-500"></div>
+    </div>
+);
+
+// --- Main Components ---
+
+const Header = ({ setPage, user }) => (
+    <header className="bg-gray-900/80 backdrop-blur-sm text-white sticky top-0 z-40 shadow-lg">
+        <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div className="text-2xl font-bold text-pink-500 cursor-pointer" onClick={() => setPage('home')}>
+                <IconWrapper icon={Music} />
+                MediaVerse
+            </div>
+            <div className="hidden md:flex items-center space-x-6">
+                <a href="#" className="hover:text-pink-400 transition-colors" onClick={(e) => { e.preventDefault(); setPage('home'); }}><IconWrapper icon={Home} />Home</a>
+                <a href="#" className="hover:text-pink-400 transition-colors" onClick={(e) => { e.preventDefault(); setPage('music'); }}><IconWrapper icon={Music} />Music</a>
+                <a href="#" className="hover:text-pink-400 transition-colors" onClick={(e) => { e.preventDefault(); setPage('videos'); }}><IconWrapper icon={Video} />Videos</a>
+            </div>
+            <div className="flex items-center space-x-4">
+                {user && user.isAdmin && (
+                    <button onClick={() => setPage('admin')} className="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Admin Panel">
+                        <Shield size={20} />
+                    </button>
+                )}
+                <button onClick={() => setPage('profile')} className="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Profile">
+                    <User size={20} />
+                </button>
+            </div>
+        </nav>
+    </header>
+);
+
+const ProductCard = ({ product, onGet, purchased }) => (
+    <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg transform hover:-translate-y-2 transition-transform duration-300 group">
+        <div className="relative">
+            <img src={product.coverArtUrl} alt={product.title} className="w-full h-56 object-cover" onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/300x300/1a1a2e/e94560?text=Image+Error'; }}/>
+            <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <Play size={64} className="text-white drop-shadow-lg mb-4" />
+                {purchased ? (
+                     <a href={product.downloadUrl} download className="bg-green-500 text-white font-bold py-2 px-4 rounded-full flex items-center hover:bg-green-600 transition-colors">
+                        <Download size={20} className="mr-2"/> Download Now
+                    </a>
+                ) : (
+                    <button onClick={() => onGet(product)} className="bg-pink-500 text-white font-bold py-2 px-4 rounded-full flex items-center hover:bg-pink-600 transition-colors">
+                        <Download size={20} className="mr-2"/> Get Free
+                    </button>
+                )}
+            </div>
+        </div>
+        <div className="p-4">
+            <h3 className="text-lg font-semibold text-white">{product.title}</h3>
+            <p className="text-gray-400 text-sm">{product.artist}</p>
+        </div>
+    </div>
+);
+
+const ProductsPage = ({ type, products, categories, onGet, userProfile }) => {
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    
+    const relevantCategories = ['All', ...categories.filter(c => c.type === type).map(c => c.name)];
+    const filteredProducts = products.filter(p => 
+        p.type === type && (selectedCategory === 'All' || p.category === selectedCategory)
+    );
+
+    return (
+        <div className="container mx-auto px-6 py-8">
+            <h1 className="text-4xl font-bold text-white mb-4 capitalize">{type}</h1>
+            <div className="mb-8">
+                {relevantCategories.map(cat => (
+                    <button 
+                        key={cat} 
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`mr-2 mb-2 px-4 py-2 text-sm font-medium rounded-full transition-colors ${selectedCategory === cat ? 'bg-pink-500 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
+            {filteredProducts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {filteredProducts.map(product => (
+                        <ProductCard 
+                            key={product.id} 
+                            product={product} 
+                            onGet={onGet}
+                            purchased={userProfile?.purchasedItems?.includes(product.id)}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <p className="text-gray-400 text-center">No {type} found in this category.</p>
+            )}
+        </div>
+    );
+};
+
+const HomePage = ({ products, onGet, userProfile, setPage }) => {
+    const featuredMusic = products.filter(p => p.type === 'music').slice(0, 5);
+    const featuredVideos = products.filter(p => p.type === 'video').slice(0, 5);
+
+    return (
+        <div>
+            {/* Hero Section */}
+            <div className="bg-gray-900 text-white text-center py-20 px-6">
+                <h1 className="text-5xl font-extrabold mb-4 animate-fade-in-down">Discover Your Next Favorite Track</h1>
+                <p className="text-xl text-gray-300 mb-8 animate-fade-in-up">High-quality music and video downloads at your fingertips.</p>
+                <button onClick={() => setPage('music')} className="bg-pink-500 text-white font-bold py-3 px-8 rounded-full hover:bg-pink-600 transition-transform hover:scale-105 transform">
+                    Explore Music
+                </button>
+            </div>
+
+            {/* Featured Music */}
+            <div className="container mx-auto px-6 py-12">
+                <h2 className="text-3xl font-bold text-white mb-6">Featured Music</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {featuredMusic.map(product => (
+                        <ProductCard 
+                            key={product.id} 
+                            product={product} 
+                            onGet={onGet}
+                            purchased={userProfile?.purchasedItems?.includes(product.id)}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Featured Videos */}
+            <div className="container mx-auto px-6 py-12">
+                <h2 className="text-3xl font-bold text-white mb-6">Featured Videos</h2>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {featuredVideos.map(product => (
+                        <ProductCard 
+                            key={product.id} 
+                            product={product} 
+                            onGet={onGet}
+                            purchased={userProfile?.purchasedItems?.includes(product.id)}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ProfilePage = ({ user, userProfile, products }) => {
+    if (!user) {
+        return <div className="text-center text-white p-10">Please wait...</div>;
+    }
+    
+    const purchasedProducts = products.filter(p => userProfile?.purchasedItems?.includes(p.id));
+
+    return (
+        <div className="container mx-auto px-6 py-8 text-white">
+            <h1 className="text-4xl font-bold mb-6">Your Profile</h1>
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+                <p className="text-lg"><strong className="text-pink-400">User ID:</strong> <span className="text-gray-300 font-mono">{user.uid}</span></p>
+                <p className="text-lg"><strong className="text-pink-400">Status:</strong> <span className="text-gray-300">{user.isAdmin ? 'Administrator' : 'Member'}</span></p>
+            </div>
+            
+            <h2 className="text-3xl font-bold mb-6">Your Downloads</h2>
+            {purchasedProducts.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {purchasedProducts.map(product => (
+                        <ProductCard key={product.id} product={product} purchased={true} />
+                    ))}
+                </div>
+            ) : (
+                <div className="bg-gray-800 p-6 rounded-lg text-center">
+                    <p className="text-gray-400">You haven't acquired any items yet.</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const AdminPage = ({ products, categories, setProducts, setCategories }) => {
+    const [showProductModal, setShowProductModal] = useState(false);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [productToEdit, setProductToEdit] = useState(null);
+
+    const handleProductSubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const newProduct = {
+            title: formData.get('title'),
+            artist: formData.get('artist'),
+            type: formData.get('type'),
+            category: formData.get('category'),
+            price: parseFloat(formData.get('price')),
+            coverArtUrl: formData.get('coverArtUrl') || `https://placehold.co/300x300/1a1a2e/e94560?text=${formData.get('title').replace(' ', '+')}`,
+            downloadUrl: formData.get('downloadUrl') || '#',
+        };
+
+        if (!isFirebaseConfigured) {
+            // Mock logic
+            const updatedProducts = productToEdit 
+                ? products.map(p => p.id === productToEdit.id ? {...newProduct, id: p.id} : p)
+                : [...products, {...newProduct, id: Date.now().toString()}];
+            setProducts(updatedProducts);
+            console.log("Mock product saved:", newProduct);
+        } else {
+            // Firebase logic
+            try {
+                if (productToEdit) {
+                    await setDoc(doc(db, "products", productToEdit.id), newProduct);
+                } else {
+                    await addDoc(collection(db, "products"), newProduct);
+                }
+            } catch (error) {
+                console.error("Error saving product:", error);
+            }
+        }
+        
+        setShowProductModal(false);
+        setProductToEdit(null);
+    };
+
+    const handleCategorySubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const newCategory = {
+            name: formData.get('name'),
+            type: formData.get('type'),
+        };
+
+        if (!isFirebaseConfigured) {
+            setCategories([...categories, {...newCategory, id: Date.now().toString()}]);
+            console.log("Mock category saved:", newCategory);
+        } else {
+            try {
+                await addDoc(collection(db, "categories"), newCategory);
+            } catch (error) {
+                console.error("Error saving category:", error);
+            }
+        }
+        
+        setShowCategoryModal(false);
+    };
+    
+    const handleDeleteProduct = async (productId) => {
+        // Replaced window.confirm with a simpler confirmation for this environment
+        const confirmDelete = true; // In a real app, use a custom modal for confirmation
+        if (confirmDelete) {
+            if (!isFirebaseConfigured) {
+                setProducts(products.filter(p => p.id !== productId));
+            } else {
+                try {
+                    await deleteDoc(doc(db, "products", productId));
+                } catch (error) {
+                    console.error("Error deleting product:", error);
+                }
+            }
+        }
+    };
+
+    const handleEditProduct = (product) => {
+        setProductToEdit(product);
+        setShowProductModal(true);
+    };
+
+    return (
+        <div className="container mx-auto px-6 py-8 text-white">
+            <h1 className="text-4xl font-bold mb-6">Admin Panel</h1>
+            
+            {/* Actions */}
+            <div className="flex space-x-4 mb-8">
+                <button onClick={() => { setProductToEdit(null); setShowProductModal(true); }} className="bg-pink-500 text-white font-bold py-2 px-4 rounded-lg flex items-center hover:bg-pink-600 transition-colors">
+                    <PlusCircle size={20} className="mr-2"/> Add Product
+                </button>
+                <button onClick={() => setShowCategoryModal(true)} className="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center hover:bg-gray-700 transition-colors">
+                    <PlusCircle size={20} className="mr-2"/> Add Category
+                </button>
+            </div>
+
+            {/* Product List */}
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 className="text-2xl font-bold mb-4">Manage Products</h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="border-b border-gray-700">
+                                <th className="p-3">Title</th>
+                                <th className="p-3">Artist</th>
+                                <th className="p-3">Type</th>
+                                <th className="p-3">Category</th>
+                                <th className="p-3">Price</th>
+                                <th className="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {products.map(product => (
+                                <tr key={product.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                    <td className="p-3">{product.title}</td>
+                                    <td className="p-3">{product.artist}</td>
+                                    <td className="p-3 capitalize">{product.type}</td>
+                                    <td className="p-3">{product.category}</td>
+                                    <td className="p-3">${product.price.toFixed(2)}</td>
+                                    <td className="p-3">
+                                        <button onClick={() => handleEditProduct(product)} className="text-blue-400 hover:text-blue-300 mr-4">Edit</button>
+                                        <button onClick={() => handleDeleteProduct(product.id)} className="text-red-400 hover:text-red-300"><Trash2 size={18}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Product Modal */}
+            {showProductModal && (
+                <Modal onClose={() => { setShowProductModal(false); setProductToEdit(null); }}>
+                    <h2 className="text-2xl font-bold mb-4 text-white">{productToEdit ? 'Edit Product' : 'Add New Product'}</h2>
+                    <form onSubmit={handleProductSubmit} className="space-y-4">
+                        <input name="title" defaultValue={productToEdit?.title} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Title" required />
+                        <input name="artist" defaultValue={productToEdit?.artist} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Artist" required />
+                        <select name="type" defaultValue={productToEdit?.type || 'music'} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white">
+                            <option value="music">Music</option>
+                            <option value="video">Video</option>
+                        </select>
+                        <input name="category" defaultValue={productToEdit?.category} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Category" required />
+                        <input name="price" defaultValue={productToEdit?.price} type="number" step="0.01" className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Price (0 for free)" required />
+                        <input name="coverArtUrl" defaultValue={productToEdit?.coverArtUrl} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Cover Art URL" />
+                        <input name="downloadUrl" defaultValue={productToEdit?.downloadUrl} className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Download File URL" />
+                        <button type="submit" className="w-full bg-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-600 transition-colors">
+                            {productToEdit ? 'Save Changes' : 'Add Product'}
+                        </button>
+                    </form>
+                </Modal>
+            )}
+
+            {/* Category Modal */}
+            {showCategoryModal && (
+                <Modal onClose={() => setShowCategoryModal(false)}>
+                    <h2 className="text-2xl font-bold mb-4 text-white">Add New Category</h2>
+                    <form onSubmit={handleCategorySubmit} className="space-y-4">
+                        <input name="name" className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white" placeholder="Category Name" required />
+                        <select name="type" className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white">
+                            <option value="music">Music</option>
+                            <option value="video">Video</option>
+                        </select>
+                        <button type="submit" className="w-full bg-pink-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-pink-600 transition-colors">
+                            Add Category
+                        </button>
+                    </form>
+                </Modal>
+            )}
+        </div>
+    );
+};
+
+// --- Main App Component ---
+
+export default function App() {
+    const [page, setPage] = useState('home');
+    const [products, setProducts] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [user, setUser] = useState(null);
+    const [userProfile, setUserProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [showGetMessage, setShowGetMessage] = useState(false);
+
+    // --- Admin User IDs ---
+    // In a real app, this would be managed securely in your backend/database rules.
+    const ADMIN_UIDS = ['YOUR_ADMIN_UID_HERE']; 
+
+    useEffect(() => {
+        if (!isFirebaseConfigured) {
+            console.warn("Firebase is not configured. Using mock data.");
+            setProducts(mockProducts);
+            setCategories(mockCategories);
+            // Simulate a mock user
+            const mockUser = { uid: 'mock_user_123', isAdmin: true };
+            setUser(mockUser);
+            setUserProfile({ purchasedItems: [] });
+            setLoading(false);
+            return;
+        }
+
+        // Firebase Auth State Listener
+        const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+            if (currentUser) {
+                const isAdmin = ADMIN_UIDS.includes(currentUser.uid);
+                setUser({ ...currentUser, isAdmin });
+            } else {
+                signInAnonymously(auth).catch(error => console.error("Anonymous sign-in failed:", error));
+            }
+        });
+
+        return () => unsubscribeAuth();
+    }, []);
+
+    // Effect for fetching data and listening to user profile changes
+    useEffect(() => {
+        if (!isFirebaseConfigured || !user) return;
+
+        setLoading(true);
+
+        // Fetch Products
+        const unsubscribeProducts = onSnapshot(collection(db, "products"), (snapshot) => {
+            const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setProducts(productsData);
+            setLoading(false);
+        });
+
+        // Fetch Categories
+        const unsubscribeCategories = onSnapshot(collection(db, "categories"), (snapshot) => {
+            const categoriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setCategories(categoriesData);
+        });
+
+        // Fetch/Listen to User Profile
+        const userDocRef = doc(db, "users", user.uid);
+        const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setUserProfile(docSnap.data());
+            } else {
+                // Create profile if it doesn't exist
+                setDoc(userDocRef, { purchasedItems: [] });
+                setUserProfile({ purchasedItems: [] });
+            }
+        });
+
+        return () => {
+            unsubscribeProducts();
+            unsubscribeCategories();
+            unsubscribeProfile();
+        };
+
+    }, [user]);
+
+    const handleGetItem = async (product) => {
+        if (!user) {
+            // In a real app, you might show a login/signup modal here.
+            console.error("User not logged in.");
+            return;
+        }
+
+        if (userProfile?.purchasedItems?.includes(product.id)) {
+            // This case is handled by the UI, but this is a safeguard.
+            console.log("Item already owned.");
+            return;
+        }
+
+        const updatedPurchasedItems = [...(userProfile.purchasedItems || []), product.id];
+        
+        if (!isFirebaseConfigured) {
+            setUserProfile({ ...userProfile, purchasedItems: updatedPurchasedItems });
+            console.log("Mock 'get' successful for:", product.title);
+        } else {
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                // This saves the downloaded item's ID to the user's profile in Firebase.
+                await setDoc(userDocRef, { purchasedItems: updatedPurchasedItems }, { merge: true });
+            } catch (error) {
+                console.error("Failed to get item:", error);
+                return;
+            }
+        }
+        
+        setShowGetMessage(true);
+        setTimeout(() => setShowGetMessage(false), 3000);
+    };
+
+    const renderPage = () => {
+        if (loading) {
+            return <div className="h-screen flex items-center justify-center"><Spinner /></div>;
+        }
+        switch (page) {
+            case 'home':
+                return <HomePage products={products} onGet={handleGetItem} userProfile={userProfile} setPage={setPage} />;
+            case 'music':
+                return <ProductsPage type="music" products={products} categories={categories} onGet={handleGetItem} userProfile={userProfile} />;
+            case 'videos':
+                return <ProductsPage type="video" products={products} categories={categories} onGet={handleGetItem} userProfile={userProfile} />;
+            case 'profile':
+                return <ProfilePage user={user} userProfile={userProfile} products={products} />;
+            case 'admin':
+                return user?.isAdmin ? <AdminPage products={products} categories={categories} setProducts={setProducts} setCategories={setCategories} /> : <div className="text-center text-red-500 p-10">Access Denied.</div>;
+            default:
+                return <HomePage products={products} onGet={handleGetItem} userProfile={userProfile} setPage={setPage} />;
+        }
+    };
+
+    return (
+        <div className="bg-gray-900 min-h-screen font-sans">
+            <Header setPage={setPage} user={user} />
+            <main>
+                {renderPage()}
+            </main>
+            <footer className="bg-gray-800 text-white text-center p-6 mt-12 border-t border-gray-700">
+                <p>&copy; 2024 MediaVerse. All Rights Reserved.</p>
+            </footer>
+            {showGetMessage && (
+                <div className="fixed bottom-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg animate-fade-in-up">
+                    Item added to your profile! You can download it now.
+                </div>
+            )}
+        </div>
+    );
+}
