@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeatHub - Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* Basic Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        /* Button Styles */
+        .btn-primary {
+            background-color: #6d28d9;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #5b21b6;
+        }
+        .btn-secondary {
+            background-color: #374151;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4b5563;
+        }
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+
+    <!-- Page Content -->
+    <main id="main-content" class="p-6 md:p-8">
+        
+        <!-- Login Page -->
+        <div id="login" class="page">
+            <div class="max-w-md mx-auto mt-20">
+                <h1 class="text-3xl font-bold text-center text-purple-400 mb-4">BeatHub Admin</h1>
+                <div class="bg-gray-800 rounded-lg shadow-xl p-8">
+                    <h2 class="text-2xl font-bold text-center mb-6">Admin Login</h2>
+                    <form id="login-form">
+                        <div class="mb-4">
+                            <label for="email" class="block text-gray-400 mb-2">Email</label>
+                            <input type="email" id="email" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <div class="mb-6">
+                            <label for="password" class="block text-gray-400 mb-2">Password</label>
+                            <input type="password" id="password" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        <p id="login-error" class="text-red-500 text-sm text-center mb-4 hidden">Invalid email or password.</p>
+                        <button type="submit" class="w-full btn-primary py-3 rounded-lg font-bold">Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Page -->
+        <div id="admin" class="page hidden">
+            <h1 class="text-3xl font-bold mb-6">Admin Dashboard</h1>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Stat Card -->
+                <div class="bg-gray-800 p-6 rounded-lg">
+                    <h3 class="text-gray-400 text-sm font-medium">Total Revenue</h3>
+                    <p class="text-3xl font-bold mt-1">$12,485</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg">
+                    <h3 class="text-gray-400 text-sm font-medium">Total Downloads</h3>
+                    <p class="text-3xl font-bold mt-1">34,592</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg">
+                    <h3 class="text-gray-400 text-sm font-medium">New Users</h3>
+                    <p class="text-3xl font-bold mt-1">1,204</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg">
+                    <h3 class="text-gray-400 text-sm font-medium">Items for Sale</h3>
+                    <p class="text-3xl font-bold mt-1">856</p>
+                </div>
+            </div>
+
+            <div class="mt-8 bg-gray-800 rounded-lg p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                    <h2 class="text-xl font-bold mb-4 sm:mb-0">Manage Content</h2>
+                    <button onclick="showPage('upload-content')" class="btn-primary py-2 px-4 rounded-lg flex items-center space-x-2">
+                        <i class="fas fa-plus"></i>
+                        <span>Add New Item</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="p-3">Title</th>
+                                <th class="p-3">Type</th>
+                                <th class="p-3">Price</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="content-table-body">
+                            <tr id="item-1" class="border-b border-gray-700">
+                                <td class="p-3">Synthwave Dreams</td>
+                                <td class="p-3">Video</td>
+                                <td class="p-3">$2.99</td>
+                                <td class="p-3"><span class="bg-green-500 text-white px-2 py-1 text-xs rounded-full">Published</span></td>
+                                <td class="p-3 space-x-2">
+                                    <button onclick="openEditForm('item-1')" class="text-blue-400 hover:text-blue-300"><i class="fas fa-edit"></i></button>
+                                    <button onclick="openDeleteModal('item-1')" class="text-red-500 hover:text-red-400"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr id="item-2" class="border-b border-gray-700">
+                                <td class="p-3">Ocean Drone Footage</td>
+                                <td class="p-3">Video</td>
+                                <td class="p-3">Free</td>
+                                <td class="p-3"><span class="bg-green-500 text-white px-2 py-1 text-xs rounded-full">Published</span></td>
+                                <td class="p-3 space-x-2">
+                                    <button onclick="openEditForm('item-2')" class="text-blue-400 hover:text-blue-300"><i class="fas fa-edit"></i></button>
+                                    <button onclick="openDeleteModal('item-2')" class="text-red-500 hover:text-red-400"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr id="item-3" class="border-b border-gray-700">
+                                <td class="p-3">Midnight City</td>
+                                <td class="p-3">Music</td>
+                                <td class="p-3">$1.99</td>
+                                <td class="p-3"><span class="bg-yellow-500 text-white px-2 py-1 text-xs rounded-full">Draft</span></td>
+                                <td class="p-3 space-x-2">
+                                    <button onclick="openEditForm('item-3')" class="text-blue-400 hover:text-blue-300"><i class="fas fa-edit"></i></button>
+                                    <button onclick="openDeleteModal('item-3')" class="text-red-500 hover:text-red-400"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Upload Content Page -->
+         <div id="upload-content" class="page hidden">
+             <div class="max-w-2xl mx-auto">
+                <button onclick="showPage('admin')" class="btn-secondary mb-6 py-2 px-4 rounded-lg flex items-center space-x-2">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to Dashboard</span>
+                </button>
+                <div class="bg-gray-800 rounded-lg shadow-xl p-8">
+                    <h2 class="text-2xl font-bold mb-6">Upload New Media</h2>
+                    <form onsubmit="event.preventDefault(); alert('Item Uploaded!'); showPage('admin');">
+                        <div class="mb-4">
+                            <label for="upload-title" class="block text-gray-400 mb-2">Video Title</label>
+                            <input type="text" id="upload-title" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                         <div class="mb-4">
+                            <label for="upload-artist" class="block text-gray-400 mb-2">Artist</label>
+                            <input type="text" id="upload-artist" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                         <div class="mb-4">
+                            <label for="upload-category" class="block text-gray-400 mb-2">Category</label>
+                            <select id="upload-category" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <option>Music</option>
+                                <option>Video</option>
+                                <option>Sound Effect</option>
+                                <option>Tutorial</option>
+                            </select>
+                        </div>
+                         <div class="mb-4">
+                            <label for="upload-date" class="block text-gray-400 mb-2">Date</label>
+                            <input type="date" id="upload-date" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                         <div class="mb-6">
+                            <label for="upload-drive-link" class="block text-gray-400 mb-2">Drive Link</label>
+                            <input type="url" id="upload-drive-link" placeholder="https://..." class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                        <button type="submit" class="w-full btn-primary py-3 rounded-lg font-bold">Upload</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Edit Content Page -->
+        <div id="edit-content" class="page hidden">
+             <div class="max-w-2xl mx-auto">
+                <button onclick="showPage('admin')" class="btn-secondary mb-6 py-2 px-4 rounded-lg flex items-center space-x-2">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to Dashboard</span>
+                </button>
+                <div class="bg-gray-800 rounded-lg shadow-xl p-8">
+                    <h2 class="text-2xl font-bold mb-6">Edit Media</h2>
+                    <form id="edit-form" onsubmit="updateItem(event)">
+                        <input type="hidden" id="edit-item-id">
+                        <div class="mb-4">
+                            <label for="edit-title" class="block text-gray-400 mb-2">Title</label>
+                            <input type="text" id="edit-title" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                         <div class="mb-4">
+                            <label for="edit-type" class="block text-gray-400 mb-2">Type</label>
+                            <input type="text" id="edit-type" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                         <div class="mb-4">
+                            <label for="edit-price" class="block text-gray-400 mb-2">Price</label>
+                            <input type="text" id="edit-price" class="w-full bg-gray-700 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                        </div>
+                        <button type="submit" class="w-full btn-primary py-3 rounded-lg font-bold">Update</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </main>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-8 max-w-sm mx-auto">
+            <h3 class="text-xl font-bold text-center">Are you sure?</h3>
+            <p class="text-gray-400 text-center my-4">Do you really want to delete this item? This process cannot be undone.</p>
+            <div class="flex justify-center space-x-4 mt-6">
+                <button onclick="closeDeleteModal()" class="btn-secondary py-2 px-6 rounded-lg">Cancel</button>
+                <button id="confirm-delete-btn" class="bg-red-600 hover:bg-red-700 text-white py-2 px-6 rounded-lg font-bold">Delete</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Page Navigation ---
+        const pages = document.querySelectorAll('.page');
+        
+        function showPage(pageId) {
+            pages.forEach(page => {
+                page.classList.toggle('hidden', page.id !== pageId);
+            });
+            window.scrollTo(0, 0);
+        }
+
+        // --- Admin Login Logic ---
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (email === 'jjayuyt@gmail.com' && password === 'Jatystr@021') {
+                loginError.classList.add('hidden');
+                showPage('admin');
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        });
+        
+        // --- Delete Modal Logic ---
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        let itemToDeleteId = null;
+
+        function openDeleteModal(itemId) {
+            itemToDeleteId = itemId;
+            deleteModal.classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            itemToDeleteId = null;
+            deleteModal.classList.add('hidden');
+        }
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (itemToDeleteId) {
+                const itemRow = document.getElementById(itemToDeleteId);
+                if (itemRow) {
+                    itemRow.remove();
+                }
+                closeDeleteModal();
+            }
+        });
+        
+        // --- Edit and Update Logic ---
+        function openEditForm(itemId) {
+            const row = document.getElementById(itemId);
+            if (!row) return;
+
+            const title = row.cells[0].textContent;
+            const type = row.cells[1].textContent;
+            const price = row.cells[2].textContent;
+
+            document.getElementById('edit-item-id').value = itemId;
+            document.getElementById('edit-title').value = title;
+            document.getElementById('edit-type').value = type;
+            document.getElementById('edit-price').value = price;
+            
+            showPage('edit-content');
+        }
+
+        function updateItem(event) {
+            event.preventDefault();
+            
+            const itemId = document.getElementById('edit-item-id').value;
+            const newTitle = document.getElementById('edit-title').value;
+            const newType = document.getElementById('edit-type').value;
+            const newPrice = document.getElementById('edit-price').value;
+            
+            const row = document.getElementById(itemId);
+            if (!row) return;
+
+            row.cells[0].textContent = newTitle;
+            row.cells[1].textContent = newType;
+            row.cells[2].textContent = newPrice;
+            
+            showPage('admin');
+        }
+
+        // Initialize with the login page
+        document.addEventListener('DOMContentLoaded', () => {
+            showPage('login');
+        });
+    </script>
+</body>
+</html>
