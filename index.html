@@ -163,6 +163,7 @@
                                     <option value="Tutorial">Tutorial</option>
                                 </select>
                             </div>
+                             <div class="mb-4"><label class="block text-gray-400 mb-2">YouTube Video ID (for thumbnails)</label><input type="text" id="youtubeId" placeholder="e.g. dQw4w9WgXcQ" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"></div>
                             <div class="mb-4"><label class="block text-gray-400 mb-2">Access</label>
                                 <select id="access" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500">
                                     <option value="free">Free</option>
@@ -191,6 +192,7 @@
                             <input type="hidden" id="edit-item-id">
                             <div class="mb-4"><label class="block text-gray-400 mb-2">Title</label><input type="text" id="edit-title" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required></div>
                             <div class="mb-4"><label class="block text-gray-400 mb-2">Type</label><input type="text" id="edit-type" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500" required></div>
+                             <div class="mb-4"><label class="block text-gray-400 mb-2">YouTube Video ID</label><input type="text" id="edit-youtubeId" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"></div>
                             <div class="mb-4"><label class="block text-gray-400 mb-2">Access</label><select id="edit-access" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"><option value="free">Free</option><option value="paid">Paid</option></select></div>
                             <div class="mb-4"><label class="block text-gray-400 mb-2">Price (₹)</label><input type="number" id="edit-price" class="w-full bg-gray-800 text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-purple-500"></div>
                             <button type="submit" class="w-full btn-primary py-3 rounded-lg font-bold">Update</button>
@@ -276,7 +278,14 @@
         function mediaCard(item) {
             const isPaid = item.access === 'paid' && Number(item.price) > 0;
             const priceBadge = isPaid ? `<span class="font-bold text-green-400">₹${Number(item.price).toFixed(0)}</span>` : `<span class="font-bold text-blue-400">Free</span>`;
-            const image = item.thumbnail || (item.type === 'Video' ? `https://placehold.co/600x338/${Math.floor(Math.random()*899999+100000).toString(16)}/ffffff?text=${encodeURIComponent(item.title)}` : `https://placehold.co/600x600/${Math.floor(Math.random()*899999+100000).toString(16)}/ffffff?text=ALBUM`);
+            
+            let image;
+            if (item.youtubeId && item.type === 'Video') {
+                image = `https://img.youtube.com/vi/${item.youtubeId}/hqdefault.jpg`;
+            } else {
+                image = item.thumbnail || (item.type === 'Video' ? `https://placehold.co/600x338/${Math.floor(Math.random()*899999+100000).toString(16)}/ffffff?text=${encodeURIComponent(item.title)}` : `https://placehold.co/600x600/${Math.floor(Math.random()*899999+100000).toString(16)}/ffffff?text=ALBUM`);
+            }
+
             return `
                 <div class="bg-gray-900 rounded-lg overflow-hidden card-hover-effect cursor-pointer">
                     <img src="${image}" alt="Thumbnail" class="w-full h-40 object-cover">
@@ -362,6 +371,7 @@
             const title = document.getElementById('title').value.trim();
             const artist = document.getElementById('artist').value.trim();
             const type = document.getElementById('type').value;
+            const youtubeId = document.getElementById('youtubeId').value.trim();
             const access = document.getElementById('access').value;
             const price = Number(document.getElementById('price').value || 0);
             const date = document.getElementById('date').value;
@@ -371,7 +381,7 @@
             const uploadProgress = document.getElementById('upload-progress');
 
             uploadStatus.textContent = 'Creating item...';
-            const docRef = await addDoc(mediaCol, { title, artist, type, access, price, status: 'published', date, url: driveLink, storagePath: '', createdAt: serverTimestamp(), downloads: 0, revenue: 0 });
+            const docRef = await addDoc(mediaCol, { title, artist, type, youtubeId, access, price, status: 'published', date, url: driveLink, storagePath: '', createdAt: serverTimestamp(), downloads: 0, revenue: 0 });
             
             if (file) {
                 const path = `media/${docRef.id}/${file.name}`;
@@ -405,6 +415,7 @@
             document.getElementById('edit-item-id').value = id;
             document.getElementById('edit-title').value = data.title || '';
             document.getElementById('edit-type').value = data.type || '';
+            document.getElementById('edit-youtubeId').value = data.youtubeId || '';
             document.getElementById('edit-access').value = data.access || 'free';
             document.getElementById('edit-price').value = Number(data.price || 0);
         };
@@ -415,9 +426,10 @@
             const id = document.getElementById('edit-item-id').value;
             const title = document.getElementById('edit-title').value.trim();
             const type = document.getElementById('edit-type').value.trim();
+            const youtubeId = document.getElementById('edit-youtubeId').value.trim();
             const access = document.getElementById('edit-access').value;
             const price = Number(document.getElementById('edit-price').value || 0);
-            await updateDoc(doc(db, 'media', id), { title, type, access, price });
+            await updateDoc(doc(db, 'media', id), { title, type, youtubeId, access, price });
             showPage('admin');
         });
 
